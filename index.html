@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Neigra</title>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <style>
+    :root {
+      --bg-color: #121318;
+      --panel-bg: rgba(22, 24, 33, 0.9);
+      --accent-green: #00e676;
+      --accent-blue: #29b6f6;
+      --accent-red: #ff5252;
+      --text-main: #f0f4f8;
+      --text-sub: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      touch-action: none;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg-color);
+      color: var(--text-main);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #ui {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 16px;
+      border-radius: 14px;
+      z-index: 10;
+      width: calc(100% - 30px);
+      max-width: 280px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+
+    #ui.collapsed {
+      transform: translateY(-130%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #toggle-ui-btn {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      z-index: 11;
+      background: var(--panel-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+      padding: 8px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+
+    h1 {
+      font-size: 1.2rem;
+      font-weight: 800;
+      margin-bottom: 12px;
+      text-align: center;
+      background: linear-gradient(135deg, #fff 0%, var(--accent-green) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 3px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 6px;
+      font-size: 0.75rem;
+      background: transparent;
+      color: var(--text-sub);
+      border-radius: 6px;
+      box-shadow: none;
+      margin: 0;
+    }
+
+    .tab-btn.active {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    button, input {
+      margin: 4px 0;
+      padding: 10px;
+      width: 100%;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      outline: none;
+    }
+
+    button {
+      background: var(--accent-green);
+      color: #051e11;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 230, 118, 0.2);
+    }
+
+    button.blue {
+      background: var(--accent-blue);
+      color: #032030;
+    }
+
+    button.danger {
+      background: transparent;
+      color: var(--accent-red);
+      border: 1px solid rgba(255, 82, 82, 0.3);
+      box-shadow: none;
+      margin-top: 8px;
+    }
+
+    input {
+      background: rgba(0, 0, 0, 0.3);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      text-align: center;
+    }
+
+    .code-display {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 6px;
+      border-radius: 6px;
+      text-align: center;
+      font-family: monospace;
+      font-size: 0.95rem;
+      color: var(--accent-blue);
+      letter-spacing: 1px;
+      user-select: all;
+      margin: 4px 0;
+      border: 1px dashed rgba(41, 182, 246, 0.3);
+    }
+
+    canvas {
+      display: block;
+      cursor: grab;
+    }
+
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    @media (max-width: 600px) {
+      #ui {
+        top: auto;
+        bottom: 15px;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      #ui.collapsed {
+        transform: translate(-50%, 140%);
+      }
+
+      #toggle-ui-btn {
+        top: auto;
+        bottom: 15px;
+        right: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <button id="toggle-ui-btn" onclick="toggleUI()">⚙️ Menü</button>
+
+  <div id="ui">
+    <h1>Neigra</h1>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('local')">Lokal</button>
+      <button class="tab-btn" onclick="switchTab('online')">Online</button>
+    </div>
+    
+    <div id="tab-local" class="tab-content active">
+      <button onclick="startBotMode()">🤖 Gegen Bot</button>
+    </div>
+
+    <div id="tab-online" class="tab-content">
+      <div style="font-size: 0.7rem; color: var(--text-sub); text-align: center;">Dein Code:</div>
+      <div class="code-display" id="my-code">...</div>
+      <input type="text" id="join-code" placeholder="Freund-Code">
+      <button class="blue" onclick="connectToPeer()">Verbinden</button>
+    </div>
+
+    <button class="danger" onclick="resetGame()">Neustart</button>
+  </div>
+
+  <canvas id="board"></canvas>
+
+  <script>
+    const canvas = document.getElementById('board');
+    const ctx = canvas.getContext('2d');
+
+    const BASE_CELL_SIZE = 42;
+    let zoom = 1.0;
+    let cameraX = 0;
+    let cameraY = 0;
+
+    let activePointers = new Map();
+    let initialPinchDistance = null;
+    let initialZoom = 1.0;
+    let isDragging = false;
+    let hasMoved = false;
+    let dragStartPos = { x: 0, y: 0 };
+
+    let board = {}; // "x,y" => { color, anim }
+    let lastMove = null; // { x, y }
+    let winLine = null; // { p1: {x,y}, p2: {x,y} }
+    let currentTurn = "BLACK";
+    let myColor = "BLACK";
+    let gameMode = null;
+    let gameOver = false;
+
+    let peer = null;
+    let conn = null;
+
+    function initCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      if (cameraX === 0 && cameraY === 0) {
+        cameraX = canvas.width / 2;
+        cameraY = canvas.height / 2;
+      }
+      draw();
+    }
+    window.addEventListener('resize', initCanvas);
+
+    function toggleUI() {
+      document.getElementById('ui').classList.toggle('collapsed');
+    }
+
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      
+      if (tabName === 'local') {
+        document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        document.getElementById('tab-local').classList.add('active');
+      } else {
+        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        document.getElementById('tab-online').classList.add('active');
+      }
+    }
+
+    function initPeer() {
+      const randomId = Math.floor(100000 + Math.random() * 900000).toString();
+      peer = new Peer(randomId);
+
+      peer.on('open', (id) => {
+        document.getElementById('my-code').innerText = id;
+      });
+
+      peer.on('connection', (c) => {
+        conn = c;
+        gameMode = 'ONLINE_HOST';
+        myColor = 'BLACK';
+        setupConn();
+        resetGame(false);
+      });
+    }
+
+    function connectToPeer() {
+      const code = document.getElementById('join-code').value.trim();
+      if (!code) return;
+      
+      conn = peer.connect(code);
+      gameMode = 'ONLINE_GUEST';
+      myColor = 'WHITE';
+      setupConn();
+      resetGame(false);
+    }
+
+    function setupConn() {
+      conn.on('data', (data) => {
+        if (data.type === 'MOVE') makeMove(data.x, data.y, data.color, false);
+        else if (data.type === 'RESET') resetGame(false);
+      });
+    }
+
+    function draw() {
+      ctx.fillStyle = '#121318';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const cellSize = BASE_CELL_SIZE * zoom;
+
+      // Raster
+      ctx.strokeStyle = '#1e212b';
+      ctx.lineWidth = Math.max(1, zoom);
+
+      const startX = Math.floor((-cameraX) / cellSize) - 1;
+      const endX = Math.ceil((canvas.width - cameraX) / cellSize) + 1;
+      const startY = Math.floor((-cameraY) / cellSize) - 1;
+      const endY = Math.ceil((canvas.height - cameraY) / cellSize) + 1;
+
+      ctx.beginPath();
+      for (let x = startX; x <= endX; x++) {
+        const px = x * cellSize + cameraX;
+        ctx.moveTo(px, 0);
+        ctx.lineTo(px, canvas.height);
+      }
+      for (let y = startY; y <= endY; y++) {
+        const py = y * cellSize + cameraY;
+        ctx.moveTo(0, py);
+        ctx.lineTo(canvas.width, py);
+      }
+      ctx.stroke();
+
+      let needsNextFrame = false;
+
+      // Gekritzelte Feldfüllungen ohne Outlines
+      for (let key in board) {
+        const cell = board[key];
+        const [gx, gy] = key.split(',').map(Number);
+        const px = gx * cellSize + cameraX;
+        const py = gy * cellSize + cameraY;
+
+        if (cell.anim < 1.0) {
+          cell.anim += 0.1;
+          if (cell.anim > 1.0) cell.anim = 1.0;
+          needsNextFrame = true;
+        }
+
+        drawScribbleInCell(px, py, cellSize, cell.color, cell.anim);
+      }
+
+      // Zuletzt gesetztes Feld hervorheben
+      if (lastMove) {
+        const px = lastMove.x * cellSize + cameraX;
+        const py = lastMove.y * cellSize + cameraY;
+        ctx.strokeStyle = '#ffeb3b';
+        ctx.lineWidth = 2 * zoom;
+        ctx.strokeRect(px + 2, py + 2, cellSize - 4, cellSize - 4);
+      }
+
+      // Gewinn-Linie durchstreichen
+      if (winLine) {
+        const p1x = winLine.p1.x * cellSize + cameraX + cellSize / 2;
+        const p1y = winLine.p1.y * cellSize + cameraY + cellSize / 2;
+        const p2x = winLine.p2.x * cellSize + cameraX + cellSize / 2;
+        const p2y = winLine.p2.y * cellSize + cameraY + cellSize / 2;
+
+        ctx.strokeStyle = '#ff5252';
+        ctx.lineWidth = 5 * zoom;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(p1x, p1y);
+        ctx.lineTo(p2x, p2y);
+        ctx.stroke();
+      }
+
+      if (needsNextFrame) {
+        requestAnimationFrame(draw);
+      }
+    }
+
+    function drawScribbleInCell(x, y, size, color, progress) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x + 2, y + 2, size - 4, size - 4);
+      ctx.clip();
+
+      ctx.strokeStyle = color === 'BLACK' ? '#00e676' : '#29b6f6';
+      ctx.lineWidth = Math.max(2, 3 * zoom);
+      ctx.lineCap = 'round';
+
+      const lines = 8;
+      const step = size / lines;
+      const maxDraw = lines * 2 * progress;
+
+      ctx.beginPath();
+      let drawn = 0;
+      for (let i = -lines; i < lines; i++) {
+        if (drawn >= maxDraw) break;
+        const x1 = x + i * step;
+        const y1 = y;
+        const x2 = x + (i + lines) * step;
+        const y2 = y + size;
+
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        drawn++;
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Controls & Touch
+    canvas.addEventListener('pointerdown', (e) => {
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      
+      if (activePointers.size === 1) {
+        isDragging = true;
+        hasMoved = false;
+        dragStartPos = { x: e.clientX - cameraX, y: e.clientY - cameraY };
+      } else if (activePointers.size === 2) {
+        isDragging = false;
+        const pts = Array.from(activePointers.values());
+        initialPinchDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        initialZoom = zoom;
+      }
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!activePointers.has(e.pointerId)) return;
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (activePointers.size === 1 && isDragging) {
+        const distMoved = Math.hypot(e.clientX - (dragStartPos.x + cameraX), e.clientY - (dragStartPos.y + cameraY));
+        if (distMoved > 6) hasMoved = true;
+
+        cameraX = e.clientX - dragStartPos.x;
+        cameraY = e.clientY - dragStartPos.y;
+        draw();
+      } else if (activePointers.size === 2) {
+        hasMoved = true;
+        const pts = Array.from(activePointers.values());
+        const currentDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        if (initialPinchDistance > 0) {
+          const factor = currentDistance / initialPinchDistance;
+          zoom = Math.min(Math.max(0.4, initialZoom * factor), 2.5);
+          draw();
+        }
+      }
+    });
+
+    function handlePointerUp(e) {
+      if (activePointers.size === 1 && !hasMoved) {
+        handleClick(e.clientX, e.clientY);
+      }
+      activePointers.delete(e.pointerId);
+      if (activePointers.size < 2) initialPinchDistance = null;
+      if (activePointers.size === 0) isDragging = false;
+    }
+
+    canvas.addEventListener('pointerup', handlePointerUp);
+    canvas.addEventListener('pointercancel', handlePointerUp);
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+      cameraX = e.clientX - (e.clientX - cameraX) * zoomFactor;
+      cameraY = e.clientY - (e.clientY - cameraY) * zoomFactor;
+      zoom = Math.min(Math.max(0.4, zoom * zoomFactor), 2.5);
+      draw();
+    }, { passive: false });
+
+    function handleClick(screenX, screenY) {
+      if (gameOver) return;
+      if (gameMode === 'ONLINE_HOST' && currentTurn !== 'BLACK') return;
+      if (gameMode === 'ONLINE_GUEST' && currentTurn !== 'WHITE') return;
+      if (gameMode === 'BOT' && currentTurn !== 'BLACK') return;
+
+      const cellSize = BASE_CELL_SIZE * zoom;
+      const gx = Math.floor((screenX - cameraX) / cellSize);
+      const gy = Math.floor((screenY - cameraY) / cellSize);
+
+      if (!board[`${gx},${gy}`]) {
+        makeMove(gx, gy, currentTurn, true);
+
+        if (gameMode === 'BOT' && !gameOver && currentTurn === 'WHITE') {
+          setTimeout(botMove, 300);
+        }
+      }
+    }
+
+    function makeMove(x, y, color, isLocal) {
+      const key = `${x},${y}`;
+      board[key] = { color: color, anim: 0.0 };
+      lastMove = { x, y };
+
+      if (isLocal && conn && conn.open) {
+        conn.send({ type: 'MOVE', x: x, y: y, color: color });
+      }
+
+      const winResult = checkWin(x, y, color);
+      if (winResult) {
+        gameOver = true;
+        winLine = winResult;
+      } else {
+        currentTurn = color === 'BLACK' ? 'WHITE' : 'BLACK';
+      }
+
+      draw();
+    }
+
+    function checkWin(x, y, color) {
+      const directions = [
+        [[1, 0], [-1, 0]],
+        [[0, 1], [0, -1]],
+        [[1, 1], [-1, -1]],
+        [[1, -1], [-1, 1]]
+      ];
+
+      for (let dir of directions) {
+        let cells = [{ x, y }];
+        
+        for (let [dx, dy] of dir) {
+          let cx = x + dx;
+          let cy = y + dy;
+          while (board[`${cx},${cy}`]?.color === color) {
+            cells.push({ x: cx, y: cy });
+            cx += dx;
+            cy += dy;
+          }
+        }
+
+        if (cells.length >= 5) {
+          return { p1: cells[1], p2: cells[cells.length - 1] };
+        }
+      }
+      return null;
+    }
+
+    function startBotMode() {
+      gameMode = 'BOT';
+      myColor = 'BLACK';
+      resetGame(false);
+    }
+
+    function botMove() {
+      let bestScore = -1;
+      let bestMove = null;
+
+      const candidates = new Set();
+      for (let key in board) {
+        const [x, y] = key.split(',').map(Number);
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            if (dx === 0 && dy === 0) continue;
+            const nk = `${x + dx},${y + dy}`;
+            if (!board[nk]) candidates.add(nk);
+          }
+        }
+      }
+
+      if (candidates.size === 0) candidates.add("0,0");
+
+      for (let cand of candidates) {
+        const [x, y] = cand.split(',').map(Number);
+        let score = evaluatePoint(x, y, 'WHITE') * 1.1 + evaluatePoint(x, y, 'BLACK');
+        if (score > bestScore) {
+          bestScore = score;
+          bestMove = { x, y };
+        }
+      }
+
+      if (bestMove) {
+        makeMove(bestMove.x, bestMove.y, 'WHITE', false);
+      }
+    }
+
+    function evaluatePoint(x, y, color) {
+      let score = 0;
+      const dirs = [[1, 0], [0, 1], [1, 1], [1, -1]];
+      for (let [dx, dy] of dirs) {
+        let count = 1;
+        for (let step of [1, -1]) {
+          let cx = x + dx * step;
+          let cy = y + dy * step;
+          while (board[`${cx},${cy}`]?.color === color) {
+            count++;
+            cx += dx * step;
+            cy += dy * step;
+          }
+        }
+        score += Math.pow(10, count);
+      }
+      return score;
+    }
+
+    function resetGame(sendPeer = true) {
+      board = {};
+      lastMove = null;
+      winLine = null;
+      currentTurn = 'BLACK';
+      gameOver = false;
+      draw();
+      if (sendPeer && conn && conn.open) {
+        conn.send({ type: 'RESET' });
+      }
+    }
+
+    initCanvas();
+    initPeer();
+  </script>
+</body>
+</html>
